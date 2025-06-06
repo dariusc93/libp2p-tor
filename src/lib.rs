@@ -40,12 +40,15 @@
 //!
 //! ## Example
 //! ```no_run
-//! use libp2p::core::Transport;
+//! use libp2p::core::{Endpoint, Transport};
+//! use libp2p::core::transport::{DialOpts, PortUse};
+//!
 //! # async fn test_func() -> Result<(), Box<dyn std::error::Error>> {
 //! let address = "/dns/www.torproject.org/tcp/1000".parse()?;
 //! let mut transport = libp2p_community_tor::TorTransport::bootstrapped().await?;
+//! let opt = DialOpts { port_use: PortUse::New, role: Endpoint::Dialer };
 //! // we have achieved tor connection
-//! let _conn = transport.dial(address)?.await?;
+//! let _conn = transport.dial(address, opt)?.await?;
 //! # Ok(())
 //! # }
 //! # tokio_test::block_on(test_func());
@@ -68,6 +71,7 @@ use tor_rtcompat::tokio::TokioRustlsRuntime;
 use std::collections::HashMap;
 #[cfg(feature = "listen-onion-service")]
 use std::str::FromStr;
+use libp2p::core::transport::DialOpts;
 #[cfg(feature = "listen-onion-service")]
 use tor_cell::relaycell::msg::{Connected, End, EndReason};
 #[cfg(feature = "listen-onion-service")]
@@ -221,7 +225,7 @@ impl TorTransport {
         let request_stream = Box::pin(handle_rend_requests(request_stream));
 
         let multiaddr = service
-            .onion_name()
+            .onion_address()
             .ok_or_else(|| anyhow::anyhow!("Onion service has no onion address"))?
             .to_multiaddr(port);
 
@@ -304,7 +308,7 @@ impl Transport for TorTransport {
             .services
             .iter()
             .position(|(service, _)| {
-                service.onion_name().map_or(false, |name| {
+                service.onion_address().map_or(false, |name| {
                     name.to_multiaddr(address.port()) == onion_address
                 })
             })
@@ -349,7 +353,7 @@ impl Transport for TorTransport {
         false
     }
 
-    fn dial(&mut self, addr: Multiaddr) -> Result<Self::Dial, TransportError<Self::Error>> {
+    fn dial(&mut self, addr: Multiaddr, _: DialOpts) -> Result<Self::Dial, TransportError<Self::Error>> {
         let maybe_tor_addr = match self.conversion_mode {
             AddressConversion::DnsOnly => safe_extract(&addr),
             AddressConversion::IpAndDns => dangerous_extract(&addr),
@@ -366,17 +370,6 @@ impl Transport for TorTransport {
 
             Ok(TokioTorStream::from(stream))
         }))
-    }
-
-    fn dial_as_listener(
-        &mut self,
-        addr: Multiaddr,
-    ) -> Result<Self::Dial, TransportError<Self::Error>> {
-        self.dial(addr)
-    }
-
-    fn address_translation(&self, _listen: &Multiaddr, _observed: &Multiaddr) -> Option<Multiaddr> {
-        None
     }
 
     #[cfg(not(feature = "listen-onion-service"))]
