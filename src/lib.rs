@@ -67,11 +67,11 @@ use thiserror::Error;
 use tor_rtcompat::tokio::TokioRustlsRuntime;
 
 // We only need these imports if the `listen-onion-service` feature is enabled
+use libp2p::core::transport::DialOpts;
 #[cfg(feature = "listen-onion-service")]
 use std::collections::HashMap;
 #[cfg(feature = "listen-onion-service")]
 use std::str::FromStr;
-use libp2p::core::transport::DialOpts;
 #[cfg(feature = "listen-onion-service")]
 use tor_cell::relaycell::msg::{Connected, End, EndReason};
 #[cfg(feature = "listen-onion-service")]
@@ -353,7 +353,11 @@ impl Transport for TorTransport {
         false
     }
 
-    fn dial(&mut self, addr: Multiaddr, _: DialOpts) -> Result<Self::Dial, TransportError<Self::Error>> {
+    fn dial(
+        &mut self,
+        addr: Multiaddr,
+        _: DialOpts,
+    ) -> Result<Self::Dial, TransportError<Self::Error>> {
         let maybe_tor_addr = match self.conversion_mode {
             AddressConversion::DnsOnly => safe_extract(&addr),
             AddressConversion::IpAndDns => dangerous_extract(&addr),
